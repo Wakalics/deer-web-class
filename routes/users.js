@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+const crypo = require('crypto');
 
 /*
 const mysql = require('mysql2');
@@ -32,7 +33,7 @@ router.get('/hohoho', function(req, res, next) {
 
 const pool = require('../utils/mysql');
 
-/*
+
 // GET users listing. 
 router.get('/', async (req, res, next) => {
   try {
@@ -46,15 +47,40 @@ router.get('/', async (req, res, next) => {
   }
  
 });
-*/
 
 router.post('/', async (req, res, next) => {
   try {
     const email = req.body.email;
+    const pwd = req.body.pwd;
+    const salt = (await crypo.randomBytes(64)).toString('base64');
+    const hashedPwd = (crypo.pbkdf2Sync(pwd, salt, 100000, 64, 'SHA512').toString('base64'));
     const connection = await pool.getConnection();
-    await connection.query('INSERT INTO USER_TB(email) VALUES(?)', [email]);
+    await connection.query('INSERT INTO USER_TB(email, hashed_pwd, pwd_salt) VALUES(?, ?, ?)', [email, hashedPwd, salt]);
     connection.release();
-    res.json({ status: 201, msg: 'Success!'});
+    res.json({ status: 201, msg: 'Signing up succeed!'});
+  } catch (err) {
+    console.log(err);
+    res.json({ status: 500 , msg: 'Server Error!'});
+  }
+ 
+});
+
+router.post('/login', async (req, res, next) => {
+  try {
+    const email = req.body.email;
+    const pwd = req.body.pwd;
+    const connection = await pool.getConnection();
+    const [users] = await connection.query('SELECT * FROM USER_TB WHERE email = ?', [email]);
+    connection.release();
+    if (users.length === 0) {
+      return res.json({ status: 401, message: "Email does not exists."});
+    }
+    const user = users[0];
+    const hashedPwd = (crypo.pbkdf2Sync(pwd, user.pwd_salt, 100000, 64, 'SHA512')).toString('base64');
+    if (hashedPwd !== user.hashed_pwd) {
+      return res.json({ status: 401, msg: 'Password does not match!'})
+    }
+    res.json({ status: 201, msg: 'Loggign in succeed!'});
   } catch (err) {
     console.log(err);
     res.json({ status: 500 , msg: 'Server Error!'});
