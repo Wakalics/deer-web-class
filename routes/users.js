@@ -19,7 +19,7 @@ router.get('/hohohoho', function(req, res, next) {
 });
 
 router.get('/hohohohoho', function(req, res, next) {
-  res.send('hoho hoho hoho hoho hoho');
+  res.send('Why so serious?');
 });
 
 module.exports = router;
